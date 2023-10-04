@@ -101,18 +101,10 @@ node('docker') {
                     """
                 }
 
-                // log-out
-                sh """
-                docker logout "${params.DOCKER_REGISTRY}"
-                """
             }
         }
 
     } catch(err) {
-        // log-out, if required
-        sh """
-        docker logout "${params.DOCKER_REGISTRY}" || true
-        """
 
         currentBuild.result = "FAILED"
         sparkSend(

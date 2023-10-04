@@ -170,7 +170,7 @@ main()
 	echo "... successfully in $(($(date "+%s") - _start_time)) seconds"
 	echo "==============================================================================="
 
-	cleanup
+	#cleanup
 }
 
 main "${@}"

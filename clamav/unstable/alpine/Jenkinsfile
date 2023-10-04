@@ -90,10 +90,6 @@ node('docker') {
         }
 
     } catch(err) {
-        // log-out, if required
-        sh """
-        docker logout "${params.DOCKER_REGISTRY}" || true
-        """
 
         currentBuild.result = "FAILED"
         sparkSend(

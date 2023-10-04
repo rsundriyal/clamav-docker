@@ -72,18 +72,10 @@ node('docker') {
                 docker image push ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:unstable
                 """
 
-                // log-out
-                sh """
-                docker logout "${params.DOCKER_REGISTRY}"
-                """
             }
         }
 
     } catch(err) {
-        // log-out, if required
-        sh """
-        docker logout "${params.DOCKER_REGISTRY}" || true
-        """
 
         currentBuild.result = "FAILED"
         sparkSend(
