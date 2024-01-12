@@ -97,10 +97,33 @@ clamav_db_update()
 			# Update the database
 			echo "RUN freshclam --foreground --stdout && rm /var/lib/clamav/freshclam.dat || rm /var/lib/clamav/mirrors.dat || true"
 		} | \
-		# Pull and Build the updated image with the tag without the _base suffix.
-		# Also push it to the registry.
-		docker buildx build --platform linux/amd64,linux/arm64,linux/ppc64le --pull --push --rm --tag "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}" -
+		docker buildx build --platform linux/amd64 --pull --rm --push  \
+		--tag "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}-amd64" -
+
+    {
+			# Starting with the image tag with the _base suffix
+			echo "FROM ${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag}"
+			# Update the database
+			echo "RUN freshclam --foreground --stdout && rm /var/lib/clamav/freshclam.dat || rm /var/lib/clamav/mirrors.dat || true"
+		} | \
+		docker buildx build --platform linux/arm64 --pull --rm --push \
+		--tag "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}-arm64" -
+
+    {
+      # Starting with the image tag with the _base suffix
+      echo "FROM ${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag}"
+      # Update the database
+      echo "RUN freshclam --foreground --stdout && rm /var/lib/clamav/freshclam.dat || rm /var/lib/clamav/mirrors.dat || true"
+    } | \
+		docker buildx build --platform linux/ppc64le --pull --rm --push \
+		--tag "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}-ppc64le" -
+
 	done
+
+  docker buildx imagetools  create -t  "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}" \
+           "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}-amd64" \
+           "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}-arm64" \
+           "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}-ppc64le"
 }
 
 main()
