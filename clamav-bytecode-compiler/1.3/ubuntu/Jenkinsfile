@@ -23,7 +23,7 @@ node('docker') {
     cleanWs()
 
     try {
-        // Checkout the ClamAV source code
+        // Checkout the ClamBC source code
         checkout([
             $class: 'GitSCM', branches: [[name: "${params.BRANCH}"]],
             doGenerateSubmoduleConfigurations: false,
@@ -34,7 +34,7 @@ node('docker') {
             submoduleCfg: [], userRemoteConfigs: [[url: "${params.REPOSITORY}"]]
         ])
 
-        // Remove the Dockerfile and scripts from the clamav repo, if any.
+        // Remove the Dockerfile and scripts from the bytecode compiler repo, if any.
         sh """
         rm -rf ./Dockerfile
         """
@@ -44,9 +44,9 @@ node('docker') {
             checkout scm
         }
 
-        // Use the Dockerfile and scripts from this repo.
+        // Use the Dockerfile or scripts from this repo.
         sh """
-        cp -r clamav-docker/clamav-bytecode-compiler/unstable/ubuntu/Dockerfile .
+        cp -r clamav-docker/clamav-bytecode-compiler/${params.FEATURE_VERSION}/ubuntu/Dockerfile .
         """
 
         stage('Build Image') {
@@ -55,7 +55,7 @@ node('docker') {
 
                 // Make sure we have the latest base image.
                 sh """
-                docker pull ubuntu:20.04
+                docker pull ubuntu:23.04
                 """
 
                 // Login to docker hub
