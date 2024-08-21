@@ -71,7 +71,7 @@ else
 			sleep 1
 			_timeout="$((_timeout + 1))"
 		done
-		echo "socket found, clamd started."
+		echo "socket found, clamd test started."
 	fi
 
 	if [ "${CLAMAV_NO_MILTERD:-true}" != "true" ]; then
