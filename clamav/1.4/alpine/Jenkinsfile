@@ -1,4 +1,4 @@
-gproperties([
+properties([
     parameters([
         string(name: 'DOCKER_REGISTRY', defaultValue: 'registry.hub.docker.com',                    description: 'The Docker registry to use'),
         string(name: 'REGISTRY_CREDS',  defaultValue: 'dockerhub',                                  description: 'The Jenkins credentials ID for the given registry'),
