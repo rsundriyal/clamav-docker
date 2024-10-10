@@ -99,9 +99,7 @@ clamav_db_update()
        --annotation "org.opencontainers.image.version=${FULL_VERSION}" \
        --annotation "org.opencontainers.image.ref.name=${BRANCH}" \
        --annotation "org.opencontainers.image.created=$(date -Iseconds)" \
-       --pull --rm --tag "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}" -
-		# Push the updated image with the tag without the _base suffix.
-		docker image push "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}"
+       --pull --push --rm --tag "${docker_registry}/${clamav_docker_namespace}/${clamav_docker_image}:${_tag%%_base}" -
 	done
 }
 
