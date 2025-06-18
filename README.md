@@ -16,6 +16,6 @@ We publish the following Docker images for the ClamAV project:
 
 * [`clamav-bytecode-compiler`](https://hub.docker.com/r/clamav/clambc-compiler/tags): This image is for use with compiling ClamAV bytecode signatures. Bytecode signatures do allow for more complex logic than traditional signatures. But, bytecode signatures are difficult to write and use a lot of CPU. For this reason, they are rarely used. Most ClamAV signature authors will never need to write a bytecode signature.
 
-  Based on Ubuntu Linux.
+  Based on Ubuntu Linux. 
 
   Readme for the [`clamav-bytecode-compiler` image is here](./clamav-bytecode-compiler/README.md).
