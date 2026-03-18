@@ -10,6 +10,9 @@ properties([
         string(name: 'FULL_VERSION',    defaultValue: '1.4.4',                                      description: 'Full version in X.Y.Z format'),
         string(name: 'FEATURE_VERSION', defaultValue: '1.4',                                        description: 'Feature version in X.Y format'),
         booleanParam(name: 'IS_LATEST', defaultValue: false,                                        description: 'If "true", will also publish to :latest, and :stable tags.'),
+        string(name: 'ECR_PUBLIC_REPO', defaultValue: 'public.ecr.aws/q5c1p4x0/clamav/clamav',      description: 'ClamAV AWS Public ECR repo'),
+        string(name: 'AWS_CREDENTIALS_ID', defaultValue: 'pinkhat-clamav-aws-creds', description: 'Vault path for AWS creds')
+
     ]),
     disableConcurrentBuilds(),
     buildDiscarder(logRotator(
@@ -68,6 +71,17 @@ node('docker-buildx') {
                     docker login --password-stdin --username "${DOCKER_USER}" "${params.DOCKER_REGISTRY}"
                 """
 
+                // ClamAV AWS ECR login
+                withVault([vaultSecrets: [[ path: "clamavbuild-kv/${params.AWS_CREDENTIALS_ID}", engineVersion: 1, secretValues: [
+                    [envVar: 'AWS_ACCESS_KEY_ID', vaultKey: 'aws_access_key_id'],
+                    [envVar: 'AWS_SECRET_ACCESS_KEY', vaultKey: 'aws_secret_access_key']
+                ]]]]) {
+
+                    sh """
+                    aws ecr-public get-login-password --region us-east-1 | \
+                    docker login --username AWS --password-stdin "${params.ECR_PUBLIC_REPO}"
+                    """
+                }
                 //
                 // Build the following images:
                 //  - X.Y.Z-R,  X.Y.Z-R_base
@@ -89,6 +103,7 @@ node('docker-buildx') {
                         --annotation org.opencontainers.image.ref.name=${params.BRANCH} \
                         --annotation org.opencontainers.image.created="\$(date -Iseconds)" \
                         --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-amd64 \
+                        --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-amd64 \
                         --rm --push .
 
                     docker buildx build --no-cache --platform linux/arm64 \
@@ -99,6 +114,7 @@ node('docker-buildx') {
                         --annotation org.opencontainers.image.ref.name=${params.BRANCH} \
                         --annotation org.opencontainers.image.created="\$(date -Iseconds)" \
                         --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-arm64 \
+                        --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-arm64 \
                         --rm --push .
 
                     docker buildx build --no-cache --platform linux/ppc64le \
@@ -109,12 +125,19 @@ node('docker-buildx') {
                         --annotation org.opencontainers.image.ref.name=${params.BRANCH} \
                         --annotation org.opencontainers.image.created="\$(date -Iseconds)" \
                         --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-ppc64le \
+                        --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-ppc64le \
                         --rm --push .
 
                     docker buildx imagetools create -t ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER}_base \
                         "${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-amd64" \
                         "${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-arm64" \
                         "${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-ppc64le"
+
+                    docker buildx imagetools create -t ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER}_base \
+                        "${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-amd64" \
+                        "${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-arm64" \
+                        "${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER}_base-ppc64le"
+
                 """
 
                 if (params.IS_LATEST) {
@@ -125,6 +148,12 @@ node('docker-buildx') {
                             --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FEATURE_VERSION}_base \
                             --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:stable_base \
                             --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:latest_base
+
+                        docker buildx imagetools create ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER}_base \
+                            --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}_base \
+                            --tag ${params.ECR_PUBLIC_REPO}:${params.FEATURE_VERSION}_base \
+                            --tag ${params.ECR_PUBLIC_REPO}:stable_base \
+                            --tag ${params.ECR_PUBLIC_REPO}:latest_base
                     """
                 }
                 else {
@@ -132,6 +161,11 @@ node('docker-buildx') {
                         docker buildx imagetools create ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER}_base \
                             --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}_base \
                             --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FEATURE_VERSION}_base
+
+                        docker buildx imagetools create ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER}_base \
+                            --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}_base \
+                            --tag ${params.ECR_PUBLIC_REPO}:${params.FEATURE_VERSION}_base
+
                     """
                 }
 
@@ -156,6 +190,26 @@ node('docker-buildx') {
 
                 // Publish X.Y.Z tag (without the _base suffix)
 
+                sh """
+                sleep 60
+                """
+
+                // Mirror docker hub images with DB to AWS ECR
+                def archs = ["amd64", "arm64", "ppc64le"]
+                for (arch in archs) {
+                    sh """
+                    docker buildx imagetools create \
+                      -t ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER}-${arch} \
+                      ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER}-${arch}
+                    """
+                }
+
+                sh """
+                docker buildx imagetools create \
+                  -t ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER} \
+                  ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER}
+                """
+
                 if (params.IS_LATEST) {
                     // Create & Publish 'stable' and 'latest' tags.
                     sh """
@@ -164,6 +218,12 @@ node('docker-buildx') {
                             --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FEATURE_VERSION} \
                             --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:stable \
                             --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:latest
+
+                        docker buildx imagetools create ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER} \
+                            --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION} \
+                            --tag ${params.ECR_PUBLIC_REPO}:${params.FEATURE_VERSION} \
+                            --tag ${params.ECR_PUBLIC_REPO}:stable \
+                            --tag ${params.ECR_PUBLIC_REPO}:latest
                     """
                 }
                 else {
@@ -171,6 +231,10 @@ node('docker-buildx') {
                         docker buildx imagetools create ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}-${BUILD_NUMBER} \
                             --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION} \
                             --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FEATURE_VERSION}
+
+                        docker buildx imagetools create ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${BUILD_NUMBER} \
+                            --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION} \
+                            --tag ${params.ECR_PUBLIC_REPO}:${params.FEATURE_VERSION}
                     """
                 }
 
