@@ -142,30 +142,24 @@ node('docker-buildx') {
                 """
 
                 sh """
-                docker buildx build --platform linux/amd64,linux/arm64,linux/ppc64le \
-                    --sbom=true --provenance mode=max,builder-id=${BUILD_URL} \
-                    --annotation org.opencontainers.image.base.name=${FULL_BASE_IMAGE} \
-                    --annotation org.opencontainers.image.base.build-number=${BUILD_NUMBER} \
-                    --annotation org.opencontainers.image.url=${params.REPOSITORY} \
-                    --annotation org.opencontainers.image.source=${params.REPOSITORY} \
-                    --annotation org.opencontainers.image.version=${params.FULL_VERSION} \
-                    --annotation org.opencontainers.image.ref.name=${params.BRANCH} \
-                    --annotation org.opencontainers.image.created="\$(date -Iseconds)" \
-                    --push \
-                    --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION} \
-                    --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FEATURE_VERSION} \
-                    --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${params.BASE_IMAGE} \
-                    --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${params.BASE_IMAGE}${params.BASE_IMAGE_VERSION}-${params.BASE_IMAGE_VARIANT} \
-                    --tag ${params.ECR_PUBLIC_REPO}:${params.FEATURE_VERSION}-${params.BASE_IMAGE} \
-                    --tag ${params.ECR_PUBLIC_REPO}:${params.FEATURE_VERSION}-${params.BASE_IMAGE}${params.BASE_IMAGE_VERSION}-${params.BASE_IMAGE_VARIANT} \
-                    -f - . <<EOF
-                FROM ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}_base
-
-                RUN freshclam --foreground --stdout \
-                  && rm -f /var/lib/clamav/freshclam.dat \
-                  || rm -f /var/lib/clamav/mirrors.dat \
-                  || true
-                EOF
+                    docker buildx build --platform linux/amd64,linux/arm64,linux/ppc64le \
+                        --sbom=true --provenance mode=max,builder-id=${BUILD_URL} \
+                        --annotation org.opencontainers.image.base.name=${FULL_BASE_IMAGE} \
+                        --annotation org.opencontainers.image.base.build-number=${BUILD_NUMBER} \
+                        --annotation org.opencontainers.image.url=${params.REPOSITORY} \
+                        --annotation org.opencontainers.image.source=${params.REPOSITORY} \
+                        --annotation org.opencontainers.image.version=${params.FULL_VERSION} \
+                        --annotation org.opencontainers.image.ref.name=${params.BRANCH} \
+                        --annotation org.opencontainers.image.created="\$(date -Iseconds)" \
+                        --push \
+                        --build-arg BASE_IMAGE=${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION}_base \
+                        --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FULL_VERSION} \
+                        --tag ${params.DOCKER_REGISTRY}/${params.NAMESPACE}/${params.IMAGE_NAME}:${params.FEATURE_VERSION} \
+                        --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${params.BASE_IMAGE} \
+                        --tag ${params.ECR_PUBLIC_REPO}:${params.FULL_VERSION}-${params.BASE_IMAGE}${params.BASE_IMAGE_VERSION}-${params.BASE_IMAGE_VARIANT} \
+                        --tag ${params.ECR_PUBLIC_REPO}:${params.FEATURE_VERSION}-${params.BASE_IMAGE} \
+                        --tag ${params.ECR_PUBLIC_REPO}:${params.FEATURE_VERSION}-${params.BASE_IMAGE}${params.BASE_IMAGE_VERSION}-${params.BASE_IMAGE_VARIANT} \
+                        -f Dockerfile.add-db .
                 """
 
                 // Publish X.Y.Z tag (without the _base suffix)
